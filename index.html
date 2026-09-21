@@ -207,8 +207,8 @@
    Supabase Dashboard: Settings > API Keys. Use the Publishable key
    (sb_publishable_...). On older projects it is called the anon key.
    ============================================================ */
-const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR-PUBLISHABLE-KEY";
+const SUPABASE_URL = "https://uuhyvliplauaxrwsximv.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_6Pk735oCRpQJB0dNnHIqSA_kfA-KNJa";
 /* ============================================================ */
 
 const COLLS = ["menu","orders","expenses","capital"];
@@ -560,10 +560,10 @@ const EXPORTS={
   capital:{ h:["Date","Note","Type","Amount","Logged"], r:()=>S.capital.map(c=>[c.date,c.description,c.type==="out"?"Out":"In",num(c.amount),new Date(c.createdAt).toLocaleString("en-PH")]) },
   menu:{ h:["Name","Category","Price","Cost","Margin %"], r:()=>S.menu.map(m=>[m.name,m.cat,num(m.price),num(m.cost),num(m.price)>0?Math.round((1-num(m.cost)/num(m.price))*100):0]) },
 };
-function exportCSV(set){ const e=EXPORTS[set]; if(!e)return; dl("nikis-"+set+"-"+todayStr()+".csv", toCSV(e.h,e.r())); toast("Exported "+set+".csv"); }
+function exportCSV(set){ const e=EXPORTS[set]; if(!e)return; dl("nikisfoodhub-"+set+"-"+todayStr()+".csv", toCSV(e.h,e.r())); toast("Exported "+set+".csv"); }
 function exportExcel(){
   toast("Building Excel...");
-  const go=X=>{ const wb=X.utils.book_new(); Object.keys(EXPORTS).forEach(k=>{ const e=EXPORTS[k]; const ws=X.utils.aoa_to_sheet([e.h].concat(e.r())); X.utils.book_append_sheet(wb,ws,k.charAt(0).toUpperCase()+k.slice(1)); }); X.writeFile(wb,"nikis-food-hub-"+todayStr()+".xlsx"); };
+  const go=X=>{ const wb=X.utils.book_new(); Object.keys(EXPORTS).forEach(k=>{ const e=EXPORTS[k]; const ws=X.utils.aoa_to_sheet([e.h].concat(e.r())); X.utils.book_append_sheet(wb,ws,k.charAt(0).toUpperCase()+k.slice(1)); }); X.writeFile(wb,"nikisfoodhub-"+todayStr()+".xlsx"); };
   if(window.XLSX) return go(window.XLSX);
   const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
   s.onload=()=>go(window.XLSX); s.onerror=()=>toast("Excel needs internet. Use CSV instead."); document.head.appendChild(s);
