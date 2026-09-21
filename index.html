@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#D9480F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Food Hub">
+<title>Niki's Food Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    box-sizing:border-box;
+    --bg:#FFF8F1; --surface:#FFFFFF; --surface-2:#FFF1E6;
+    --ink:#20160E; --muted:#7A6A5D; --line:#F0E2D5;
+    --brand:#D9480F; --brand-2:#B23A0C; --accent:#F59E0B;
+    --green:#15803D; --green-bg:#E7F6EC; --red:#DC2626; --red-bg:#FCEBEA;
+    --blue:#2563EB; --blue-bg:#E8EFFD; --teal:#0D9488; --teal-bg:#E3F5F2;
+    --shadow:0 6px 22px rgba(90,50,20,.09); --radius:18px;
+    --tab-h:74px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#161210; --surface:#221A16; --surface-2:#2B211A;
+      --ink:#F6EDE4; --muted:#B7A596; --line:#34281F;
+      --brand:#F97316; --brand-2:#EA6A1E; --accent:#FBBF24;
+      --green:#4ADE80; --green-bg:#14301F; --red:#F87171; --red-bg:#3A1A1A;
+      --blue:#7DB0FF; --blue-bg:#16233F; --teal:#2DD4BF; --teal-bg:#0F312D;
+      --shadow:0 8px 24px rgba(0,0,0,.45);
+    }
+  }
+  *{box-sizing:inherit}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:'Nunito',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;font-size:15px;line-height:1.4;
+    padding-top:env(safe-area-inset-top);
+  }
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:16px}
+
+  #root{display:none;flex-direction:column;min-height:100%}
+  #root.show{display:flex}
+
+  /* Gate: config + login */
+  #gate{display:none;min-height:calc(100vh - env(safe-area-inset-top));align-items:center;justify-content:center;padding:24px}
+  #gate.show{display:flex}
+  .auth{width:100%;max-width:380px}
+  .auth .logo{width:56px;height:56px;border-radius:17px;margin:0 auto 14px;
+    background:linear-gradient(140deg,var(--brand),var(--accent));display:grid;place-items:center;color:#fff;box-shadow:var(--shadow)}
+  .auth h1{text-align:center;font-size:22px;margin:0 0 4px;font-weight:800}
+  .auth .tag{text-align:center;color:var(--muted);font-size:13.5px;font-weight:600;margin-bottom:22px}
+  .auth-card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}
+  .authtabs{display:flex;gap:6px;background:var(--surface-2);padding:5px;border-radius:13px;margin-bottom:16px}
+  .authtabs button{flex:1;border:0;background:none;padding:9px;border-radius:9px;font-weight:800;font-size:14px;color:var(--muted)}
+  .authtabs button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+  .auth-err{color:var(--red);font-size:13px;font-weight:700;margin-top:10px;min-height:16px}
+  .auth-note{color:var(--muted);font-size:12px;text-align:center;margin-top:16px;line-height:1.5}
+  code{background:var(--surface-2);padding:2px 6px;border-radius:6px;font-size:12.5px;word-break:break-all}
+
+  .topbar{position:sticky;top:0;z-index:20;background:var(--bg);padding:14px 18px 8px;display:flex;align-items:center;gap:10px}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .logo{width:38px;height:38px;border-radius:12px;flex:none;background:linear-gradient(140deg,var(--brand),var(--accent));display:grid;place-items:center;color:#fff;box-shadow:var(--shadow)}
+  .brand h1{font-size:17px;margin:0;font-weight:800;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand .sub{font-size:11px;color:var(--muted);font-weight:600;margin-top:1px}
+  .sync{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);background:var(--surface);border:1px solid var(--line);padding:6px 10px;border-radius:999px;flex:none}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .dot.on{background:var(--green)} .dot.err{background:var(--red)} .dot.local{background:var(--accent)}
+
+  main#app{flex:1;padding:4px 16px calc(var(--tab-h) + env(safe-area-inset-bottom) + 12px)}
+
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(90,50,20,.06)}
+  .tab{border:0;background:none;padding:11px 4px 9px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:700}
+  .tab svg{width:23px;height:23px}
+  .tab.active{color:var(--brand)}
+
+  .section-title{font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin:18px 2px 10px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+  .kpi{padding:14px 15px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+  .kpi .label{font-size:11.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .kpi .val{font-size:23px;font-weight:800;letter-spacing:-.5px;margin-top:6px}
+  .kpi .val.sm{font-size:19px}
+  .kpi .foot{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
+  .kpi.brand{background:linear-gradient(150deg,var(--brand),var(--brand-2));border:0;color:#fff}
+  .kpi.brand .label,.kpi.brand .foot{color:#ffe7d6}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+
+  .btn{border:0;border-radius:13px;padding:13px 16px;font-weight:800;font-size:15px;background:var(--surface-2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%}
+  .btn.primary{background:linear-gradient(140deg,var(--brand),var(--brand-2));color:#fff;box-shadow:var(--shadow)}
+  .btn.ghost{background:none;border:1px solid var(--line)}
+  .btn.sm{padding:9px 12px;font-size:13px;width:auto;border-radius:11px}
+  .btn.danger{background:var(--red-bg);color:var(--red)}
+  .btn:disabled{opacity:.6}
+  .btn svg{width:18px;height:18px}
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;-webkit-overflow-scrolling:touch}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:8px 13px;border-radius:999px;font-weight:700;font-size:13px}
+  .chip.active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+  .row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row .main{min-width:0;flex:1}
+  .row .name{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .meta{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .row .amt{font-weight:800;text-align:right;white-space:nowrap}
+  .avatar{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff;background:var(--brand)}
+
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px}
+  .pill.new{background:var(--blue-bg);color:var(--blue)}
+  .pill.preparing{background:var(--surface-2);color:var(--accent)}
+  .pill.ready{background:var(--teal-bg);color:var(--teal)}
+  .pill.completed{background:var(--green-bg);color:var(--green)}
+  .pill.cancelled{background:var(--red-bg);color:var(--red)}
+  .pill.paid{background:var(--green-bg);color:var(--green)}
+  .pill.unpaid{background:var(--red-bg);color:var(--red)}
+
+  .empty{text-align:center;padding:40px 20px;color:var(--muted)}
+  .empty svg{width:52px;height:52px;opacity:.5;margin-bottom:10px}
+  .empty h3{margin:0 0 4px;color:var(--ink);font-size:16px}
+  .empty p{margin:0 0 16px;font-size:13.5px}
+
+  .fab{position:fixed;right:16px;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 14px);z-index:25;width:56px;height:56px;border-radius:18px;border:0;color:#fff;background:linear-gradient(140deg,var(--brand),var(--brand-2));box-shadow:0 10px 24px rgba(217,72,15,.4);display:grid;place-items:center}
+  .fab svg{width:26px;height:26px}
+
+  .sheet-wrap{position:fixed;inset:0;z-index:50;display:none}
+  .sheet-wrap.open{display:block}
+  .backdrop{position:absolute;inset:0;background:rgba(30,15,5,.5)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow-y:auto;background:var(--bg);border-radius:22px 22px 0 0;padding:8px 18px calc(24px + env(safe-area-inset-bottom));animation:up .22s ease}
+  @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @media(min-width:640px){.sheet{max-width:520px;margin:0 auto;border-radius:22px;bottom:auto;top:50%;transform:translateY(-50%);left:0;right:0;animation:pop .18s ease}}
+  @keyframes pop{from{opacity:0;transform:translateY(-46%)}to{opacity:1;transform:translateY(-50%)}}
+  .grab{width:40px;height:4px;border-radius:99px;background:var(--line);margin:8px auto 4px}
+  .sheet h2{font-size:19px;margin:6px 2px 14px;font-weight:800}
+
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px;letter-spacing:.2px}
+  .field input,.field select,.field textarea{width:100%;padding:12px 13px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);outline:none}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand)}
+  .field textarea{min-height:64px;resize:vertical}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .seg{display:flex;flex-wrap:wrap;gap:7px}
+  .seg button{border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:9px 12px;border-radius:11px;font-weight:800;font-size:13px}
+  .seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+  .menu-pick{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--surface)}
+  .menu-pick .nm{font-weight:800;font-size:14px}
+  .menu-pick .pr{font-size:12px;color:var(--muted);font-weight:700}
+  .addbtn{width:34px;height:34px;border-radius:10px;border:0;color:#fff;background:var(--brand);font-size:20px;font-weight:800;display:grid;place-items:center}
+
+  .lineitem{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:6px 0;font-weight:700}
+  .lineitem .x{color:var(--red);font-weight:800;padding:0 4px}
+  .totbar{display:flex;justify-content:space-between;align-items:center;margin:12px 0;padding:13px 15px;border-radius:14px;background:var(--surface-2);font-weight:800;font-size:17px}
+
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 22px);z-index:80;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-weight:800;font-size:13.5px;box-shadow:var(--shadow);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  .muted{color:var(--muted)}
+  .mini{font-size:12px;font-weight:700;color:var(--muted)}
+  .hint{font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:12px;padding:11px 13px;font-weight:600;line-height:1.45}
+</style>
+</head>
+<body>
+
+<div id="gate"></div>
+
+<div id="root">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      </div>
+      <div>
+        <h1>Niki's Food Hub</h1>
+        <div class="sub" id="dateSub"></div>
+      </div>
+    </div>
+    <button class="sync" id="syncBadge" data-action="account"><span class="dot" id="syncDot"></span><span id="syncText">Account</span></button>
+  </header>
+  <main id="app"></main>
+  <nav class="tabbar" id="tabbar">
+    <button class="tab" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg><span>Home</span></button>
+    <button class="tab" data-tab="orders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span>Orders</span></button>
+    <button class="tab" data-tab="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M5 2v20"/><path d="M17 2v20"/><path d="M21 15V2a5 5 0 0 0-4 5v6c0 1.1.9 2 2 2Z"/></svg><span>Menu</span></button>
+    <button class="tab" data-tab="money"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><circle cx="12" cy="12" r="3"/><path d="M6 9v0M18 15v0"/></svg><span>Money</span></button>
+  </nav>
+</div>
+
+<div class="sheet-wrap" id="sheetWrap">
+  <div class="backdrop" data-action="closeSheet"></div>
+  <div class="sheet" id="sheet"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+(function(){
+
+/* ============================================================
+   CONFIG  ->  paste your Supabase project URL + Publishable key here
+   Supabase Dashboard: Settings > API Keys. Use the Publishable key
+   (sb_publishable_...). On older projects it is called the anon key.
+   ============================================================ */
+const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-PUBLISHABLE-KEY";
+/* ============================================================ */
+
+const COLLS = ["menu","orders","expenses","capital"];
+const MENU_CATS = ["Meals","Merienda","Drinks","Add-ons"];
+const EXP_CATS = ["Ingredients","Packaging","Gas / Fuel","Transport","Utilities","Marketing","Other"];
+const STATUSES = ["New","Preparing","Ready","Completed","Cancelled"];
+const PAYMENTS = ["GCash","Cash","Bank","Maya","Other"];
+const CHANNELS = ["Messenger","Facebook","Text / Call","Walk-in","Other"];
+const STARTER = [
+  {cat:"Meals", name:"Spaghetti (bilao)", price:850, cost:420},
+  {cat:"Meals", name:"Pancit Bihon (bilao)", price:750, cost:360},
+  {cat:"Meals", name:"Chicken Adobo w/ rice", price:120, cost:60},
+  {cat:"Merienda", name:"Lumpiang Shanghai (25pc)", price:250, cost:130},
+  {cat:"Merienda", name:"Palabok (tub)", price:300, cost:150},
+  {cat:"Merienda", name:"Turon (per pc)", price:15, cost:7},
+  {cat:"Drinks", name:"Iced Coffee", price:60, cost:25},
+];
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const app = $("#app");
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = n => Number(n)||0;
+const peso = n => "\u20B1" + (Math.round(num(n)*100)/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pesoR = n => "\u20B1" + Math.round(num(n)).toLocaleString("en-PH");
+const initials = s => (String(s||"?").trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("")||"?").toUpperCase();
+function todayStr(d){ d=d||new Date(); const p=n=>String(n).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
+function monthKey(s){ return (s||"").slice(0,7); }
+function fmtDate(s){ if(!s) return ""; const parts=String(s).split("-"); const mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+parts[1]-1]; return mo+" "+(+parts[2]); }
+function relTime(t){ if(!t) return ""; const diff=(Date.now()-t)/1000; if(diff<60)return"just now"; if(diff<3600)return Math.floor(diff/60)+"m ago"; if(diff<86400)return Math.floor(diff/3600)+"h ago"; return Math.floor(diff/86400)+"d ago"; }
+function ic(name){
+  const p={
+    plus:'<path d="M12 5v14M5 12h14"/>', check:'<path d="M20 6 9 17l-5-5"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
+    trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+    box:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    receipt:'<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M8 7h8M8 11h8M8 15h5"/>',
+    wallet:'<path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><circle cx="16" cy="14" r="1.4"/>',
+    coin:'<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5c0-1 1-1.5 2.5-1.5s2.5.6 2.5 1.6-1 1.4-2.5 1.4-2.5.5-2.5 1.5 1 1.5 2.5 1.5 2.5-.5 2.5-1.5"/>',
+  };
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(p[name]||"")+'</svg>';
+}
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2000); }
+
+/* ---------- Supabase backend ---------- */
+let sb=null, BE=null, currentEmail="";
+function fromRow(coll,r){
+  const base={ id:r.id, createdAt: r.created_at?Date.parse(r.created_at):Date.now() };
+  if(coll==="menu")     return Object.assign(base,{ name:r.name, cat:r.category, price:num(r.price), cost:num(r.cost) });
+  if(coll==="orders")   return Object.assign(base,{ customer:r.customer, channel:r.channel, date:r.entry_date, status:r.status, paid:!!r.paid, payment:r.payment, notes:r.notes, items:Array.isArray(r.items)?r.items:[], total:num(r.total), cost:num(r.cost), updatedAt:r.updated_at?Date.parse(r.updated_at):base.createdAt });
+  if(coll==="expenses") return Object.assign(base,{ description:r.description, category:r.category, amount:num(r.amount), date:r.entry_date });
+  if(coll==="capital")  return Object.assign(base,{ description:r.description, type:r.type||"in", amount:num(r.amount), date:r.entry_date });
+  return base;
+}
+function toRow(coll,d){
+  if(coll==="menu")     return { name:d.name, category:d.cat, price:num(d.price), cost:num(d.cost) };
+  if(coll==="orders")   return { customer:d.customer, channel:d.channel, entry_date:d.date, status:d.status, paid:!!d.paid, payment:d.payment, notes:d.notes, items:d.items||[], total:num(d.total), cost:num(d.cost), updated_at:new Date().toISOString() };
+  if(coll==="expenses") return { description:d.description, category:d.category, amount:num(d.amount), entry_date:d.date };
+  if(coll==="capital")  return { description:d.description, type:d.type||"in", amount:num(d.amount), entry_date:d.date };
+  return {};
+}
+function makeSupabaseBackend(client){
+  return {
+    subscribe(coll, cb){
+      let timer=null, alive=true;
+      const load=()=>{
+        let q=client.from(coll).select("*").order("created_at",{ascending:false});
+        if(coll==="orders") q=q.limit(1000); else if(coll==="expenses") q=q.limit(2000);
+        q.then(({data,error})=>{
+          if(!alive) return;
+          if(error){ setSync("err"); if(/relation|does not exist|permission|policy/i.test(error.message||"")) toast("DB not set up yet - run the SQL"); return; }
+          setSync("on"); cb((data||[]).map(row=>fromRow(coll,row)));
+        });
+      };
+      load();
+      const ch=client.channel("rt_"+coll)
+        .on("postgres_changes",{event:"*",schema:"public",table:coll}, ()=>{ clearTimeout(timer); timer=setTimeout(load,150); })
+        .subscribe();
+      return ()=>{ alive=false; client.removeChannel(ch); };
+    },
+    add(coll,data){ return client.from(coll).insert(toRow(coll,data)).select().single().then(({data,error})=>{ if(error)throw error; return {id:data.id}; }); },
+    set(coll,id,data){ return client.from(coll).update(toRow(coll,data)).eq("id",id).then(({error})=>{ if(error)throw error; }); },
+    remove(coll,id){ return client.from(coll).delete().eq("id",id).then(({error})=>{ if(error)throw error; }); },
+  };
+}
+
+/* ---------- local backend (no Supabase: works on this device only) ---------- */
+function makeLocalBackend(){
+  const PFX="nfh_", subs={};
+  const read=c=>{ try{return JSON.parse(localStorage.getItem(PFX+c)||"[]");}catch(e){return[];} };
+  const sortd=c=>{ const a=read(c).slice(); a.sort((x,y)=>(y.createdAt||0)-(x.createdAt||0)); return a; };
+  const persist=(c,a)=>{ try{localStorage.setItem(PFX+c,JSON.stringify(a));}catch(e){} (subs[c]||[]).forEach(cb=>cb(sortd(c))); };
+  const uid=()=>"l"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  return {
+    subscribe(c,cb){ (subs[c]=subs[c]||[]).push(cb); cb(sortd(c)); return ()=>{subs[c]=(subs[c]||[]).filter(f=>f!==cb);}; },
+    add(c,data){ const a=read(c); const rec=Object.assign({},data,{id:uid(),createdAt:Date.now()}); a.push(rec); persist(c,a); return Promise.resolve({id:rec.id}); },
+    set(c,id,data){ const a=read(c); const i=a.findIndex(x=>x.id===id); const rec=Object.assign({},data,{id,createdAt:(i>=0&&a[i].createdAt)||Date.now()}); if(i>=0)a[i]=rec; else a.push(rec); persist(c,a); return Promise.resolve(); },
+    remove(c,id){ persist(c, read(c).filter(x=>x.id!==id)); return Promise.resolve(); },
+  };
+}
+
+/* ---------- state ---------- */
+const S = { menu:[], orders:[], expenses:[], capital:[], tab:"home", ordersFilter:"active", moneyTab:"summary" };
+let subs=[], booted=false, mode="";
+
+/* ---------- metrics ---------- */
+function orderTotal(o){ return (o.items||[]).reduce((s,i)=>s+num(i.price)*num(i.qty),0); }
+function orderCost(o){ return (o.items||[]).reduce((s,i)=>s+num(i.cost)*num(i.qty),0); }
+function metrics(){
+  const t=todayStr(), mk=monthKey(t);
+  const live=S.orders.filter(o=>o.status!=="Cancelled");
+  const paid=live.filter(o=>o.paid);
+  const sum=(arr,f)=>arr.reduce((s,x)=>s+f(x),0);
+  const capIn=sum(S.capital.filter(c=>c.type!=="out"),c=>num(c.amount));
+  const capOut=sum(S.capital.filter(c=>c.type==="out"),c=>num(c.amount));
+  const totalCollected=sum(paid,orderTotal);
+  const totalExpenses=sum(S.expenses,e=>num(e.amount));
+  const monthCollected=sum(paid.filter(o=>monthKey(o.date)===mk),orderTotal);
+  const monthExpenses=sum(S.expenses.filter(e=>monthKey(e.date)===mk),e=>num(e.amount));
+  const todayOrders=live.filter(o=>o.date===t);
+  return {
+    todayCount:todayOrders.length, todaySales:sum(todayOrders,orderTotal), todayCollected:sum(todayOrders.filter(o=>o.paid),orderTotal),
+    active:live.filter(o=>["New","Preparing","Ready"].includes(o.status)).length,
+    unpaidAmt:sum(live.filter(o=>!o.paid),orderTotal),
+    capNet:capIn-capOut, capIn, capOut, totalCollected, totalExpenses,
+    cashOnHand:(capIn-capOut)+totalCollected-totalExpenses,
+    monthCollected, monthExpenses, monthProfit:monthCollected-monthExpenses, monthKey:mk,
+  };
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===S.tab));
+  if(S.tab==="home") renderHome();
+  else if(S.tab==="orders") renderOrders();
+  else if(S.tab==="menu") renderMenu();
+  else if(S.tab==="money") renderMoney();
+  app.scrollTop=0;
+}
+function kpiCard(label,val,foot,cls){ return '<div class="kpi '+(cls||"")+'"><div class="label">'+esc(label)+'</div><div class="val">'+esc(val)+'</div><div class="foot">'+esc(foot||"")+'</div></div>'; }
+function kpiMini(label,val,tone){ return '<div class="kpi" style="padding:12px 12px"><div class="label">'+esc(label)+'</div><div class="val sm '+(tone||"")+'">'+esc(val)+'</div></div>'; }
+function emptyBox(icon,title,msg,action,btn){ return '<div class="empty">'+ic(icon)+'<h3>'+esc(title)+'</h3><p>'+esc(msg)+'</p>'+(action?'<button class="btn primary" style="max-width:240px;margin:0 auto" data-action="'+action+'">'+ic("plus")+esc(btn)+'</button>':'')+'</div>'; }
+
+function renderHome(){
+  const m=metrics(), recent=S.orders.slice(0,6);
+  let h='<div class="section-title">Today \u00B7 '+esc(fmtDate(todayStr()))+'</div><div class="grid2">';
+  h+=kpiCard("Sales today", pesoR(m.todaySales), m.todayCount+" order"+(m.todayCount!==1?"s":""), "brand");
+  h+=kpiCard("Collected today", pesoR(m.todayCollected), (m.todaySales-m.todayCollected>0?pesoR(m.todaySales-m.todayCollected)+" to collect":"all paid"));
+  h+=kpiCard("Active orders", m.active, "in the kitchen queue");
+  h+=kpiCard("Cash on hand", pesoR(m.cashOnHand), "capital + paid \u2212 expenses");
+  h+='</div><div class="section-title">This month</div><div class="grid3">';
+  h+=kpiMini("Revenue", pesoR(m.monthCollected))+kpiMini("Expenses", pesoR(m.monthExpenses))+kpiMini("Profit", pesoR(m.monthProfit), m.monthProfit>=0?"pos":"neg");
+  h+='</div><button class="btn primary" data-action="newOrder" style="margin-top:16px">'+ic("plus")+'Log a new order</button>';
+  h+='<div class="section-title">Recent orders</div>';
+  if(!recent.length) h+=emptyBox("box","No orders yet","Log your first Messenger order to start tracking.","newOrder","Log an order");
+  else{ h+='<div class="card">'+recent.map(orderRow).join("")+'</div>'; if(S.orders.length>6) h+='<button class="btn ghost sm" data-action="goOrders" style="width:100%;margin-top:10px">See all orders</button>'; }
+  if(m.unpaidAmt>0) h+='<div class="hint" style="margin-top:14px"><strong>'+pesoR(m.unpaidAmt)+'</strong> in unpaid orders. Tap an order to mark it paid once the GCash lands.</div>';
+  app.innerHTML=h;
+}
+function orderRow(o){
+  const st=(o.status||"New").toLowerCase();
+  const itemsTxt=(o.items||[]).map(i=>i.qty+"\u00D7 "+i.name).join(", ")||"No items";
+  return '<div class="row" data-action="openOrder" data-id="'+o.id+'"><div class="avatar">'+esc(initials(o.customer))+'</div>'+
+    '<div class="main"><div class="name">'+esc(o.customer||"Walk-in")+'</div><div class="meta">'+esc(itemsTxt)+'</div>'+
+    '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="pill '+st+'">'+esc(o.status||"New")+'</span><span class="pill '+(o.paid?"paid":"unpaid")+'">'+(o.paid?"Paid":"Unpaid")+'</span></div></div>'+
+    '<div class="amt">'+pesoR(orderTotal(o))+'<div class="mini" style="margin-top:4px">'+esc(o.date===todayStr()?relTime(o.createdAt):fmtDate(o.date))+'</div></div></div>';
+}
+function renderOrders(){
+  const f=S.ordersFilter;
+  const filters=[["active","Active"],["all","All"],["New","New"],["Preparing","Preparing"],["Ready","Ready"],["unpaid","Unpaid"],["Completed","Done"]];
+  let list=S.orders.slice();
+  if(f==="active") list=list.filter(o=>["New","Preparing","Ready"].includes(o.status));
+  else if(f==="unpaid") list=list.filter(o=>!o.paid && o.status!=="Cancelled");
+  else if(f!=="all") list=list.filter(o=>o.status===f);
+  let h='<div class="section-title">Orders</div><div class="chips">'+filters.map(([k,l])=>'<button class="chip '+(f===k?"active":"")+'" data-action="ordersFilter" data-f="'+k+'">'+esc(l)+'</button>').join("")+'</div>';
+  if(!list.length) h+=emptyBox("box","Nothing here","No orders match this filter.", (f==="active"||f==="all")?"newOrder":"", "Log an order");
+  else h+='<div class="card">'+list.map(orderRow).join("")+'</div>';
+  app.innerHTML=h;
+  app.insertAdjacentHTML("beforeend",'<button class="fab" data-action="newOrder" aria-label="New order">'+ic("plus")+'</button>');
+}
+function renderMenu(){
+  let h='<div class="section-title">Menu</div>';
+  if(!S.menu.length){
+    h+=emptyBox("receipt","No menu items yet","Add your dishes so logging orders is one tap. Want a head start?","starterMenu","Load starter menu");
+    h+='<button class="btn ghost" data-action="newMenu" style="margin-top:10px">'+ic("plus")+'Add my own item</button>';
+    app.innerHTML=h; return;
+  }
+  const byCat={}; S.menu.forEach(m=>{ (byCat[m.cat||"Other"]=byCat[m.cat||"Other"]||[]).push(m); });
+  MENU_CATS.concat(Object.keys(byCat).filter(c=>!MENU_CATS.includes(c))).forEach(cat=>{
+    const items=byCat[cat]; if(!items||!items.length) return;
+    items.sort((a,b)=>String(a.name).localeCompare(b.name));
+    h+='<div class="section-title" style="margin-top:16px">'+esc(cat)+'</div><div class="card">';
+    h+=items.map(m=>{ const marg=num(m.price)>0?Math.round((1-num(m.cost)/num(m.price))*100):0;
+      return '<div class="row" data-action="editMenu" data-id="'+m.id+'"><div class="main"><div class="name">'+esc(m.name)+'</div><div class="meta">cost '+pesoR(m.cost)+' \u00B7 margin '+marg+'%</div></div><div class="amt">'+pesoR(m.price)+'</div></div>'; }).join("");
+    h+='</div>';
+  });
+  h+='<button class="btn primary" data-action="newMenu" style="margin-top:16px">'+ic("plus")+'Add menu item</button>';
+  app.innerHTML=h;
+}
+function renderMoney(){
+  const m=metrics();
+  const tabs=[["summary","Summary"],["expenses","Expenses"],["capital","Capital"]];
+  let h='<div class="section-title">Money</div><div class="chips">'+tabs.map(([k,l])=>'<button class="chip '+(S.moneyTab===k?"active":"")+'" data-action="moneyTab" data-t="'+k+'">'+esc(l)+'</button>').join("")+'</div>';
+  if(S.moneyTab==="summary"){
+    h+='<div class="grid2" style="margin-top:4px">'+kpiCard("Cash on hand", pesoR(m.cashOnHand), "money you actually have", "brand")+kpiCard("To collect", pesoR(m.unpaidAmt), "unpaid orders")+'</div>';
+    h+='<div class="card" style="margin-top:14px;padding:4px 4px">';
+    h+=moneyLine("Capital put in", pesoR(m.capIn));
+    if(m.capOut>0) h+=moneyLine("Capital taken out","\u2212"+pesoR(m.capOut));
+    h+=moneyLine("Revenue collected (all)","+"+pesoR(m.totalCollected),"pos");
+    h+=moneyLine("Expenses (all)","\u2212"+pesoR(m.totalExpenses),"neg");
+    h+=moneyLine("= Cash on hand", pesoR(m.cashOnHand),"",true);
+    h+='</div><div class="section-title" style="margin-top:18px">This month</div><div class="grid3">';
+    h+=kpiMini("Revenue", pesoR(m.monthCollected))+kpiMini("Expenses", pesoR(m.monthExpenses))+kpiMini("Profit", pesoR(m.monthProfit), m.monthProfit>=0?"pos":"neg");
+    h+='</div><div class="hint" style="margin-top:14px">Revenue counts orders marked <strong>Paid</strong>. Mark an order paid in the Orders tab when the money lands.</div>';
+  } else if(S.moneyTab==="expenses"){
+    h+='<button class="btn primary" data-action="newExpense" style="margin:4px 0 8px">'+ic("plus")+'Add expense</button>';
+    if(!S.expenses.length) h+=emptyBox("wallet","No expenses logged","Track ingredients, packaging, gas, and transport here.","newExpense","Add expense");
+    else{
+      h+='<div class="totbar"><span>Total logged</span><span>'+pesoR(S.expenses.reduce((s,e)=>s+num(e.amount),0))+'</span></div><div class="card">';
+      h+=S.expenses.map(e=>'<div class="row" data-action="editExpense" data-id="'+e.id+'"><div class="main"><div class="name">'+esc(e.description||e.category)+'</div><div class="meta">'+esc(e.category)+' \u00B7 '+esc(fmtDate(e.date))+'</div></div><div class="amt neg">\u2212'+pesoR(e.amount)+'</div></div>').join("")+'</div>';
+    }
+  } else {
+    h+='<button class="btn primary" data-action="newCapital" style="margin:4px 0 8px">'+ic("plus")+'Add capital entry</button>';
+    if(!S.capital.length) h+=emptyBox("coin","No capital logged","Log the money put into the business to start.","newCapital","Add capital");
+    else{
+      h+='<div class="totbar"><span>Net capital in</span><span>'+pesoR(m.capNet)+'</span></div><div class="card">';
+      h+=S.capital.map(c=>{ const out=c.type==="out"; return '<div class="row" data-action="editCapital" data-id="'+c.id+'"><div class="main"><div class="name">'+esc(c.description||(out?"Withdrawal":"Capital in"))+'</div><div class="meta">'+esc(out?"Taken out":"Put in")+' \u00B7 '+esc(fmtDate(c.date))+'</div></div><div class="amt '+(out?"neg":"pos")+'">'+(out?"\u2212":"+")+pesoR(c.amount)+'</div></div>'; }).join("")+'</div>';
+    }
+  }
+  app.innerHTML=h;
+}
+function moneyLine(label,val,tone,strong){ return '<div class="row" style="padding:12px 14px"><div class="main"><div class="name" style="font-weight:'+(strong?"800":"700")+';font-size:'+(strong?"16px":"14.5px")+'">'+esc(label)+'</div></div><div class="amt '+(tone||"")+'" style="font-size:'+(strong?"17px":"15px")+'">'+esc(val)+'</div></div>'; }
+
+/* ---------- sheet ---------- */
+function openSheet(html){ $("#sheet").innerHTML='<div class="grab"></div>'+html; $("#sheetWrap").classList.add("open"); }
+function closeSheet(){ $("#sheetWrap").classList.remove("open"); }
+function selectEl(id,opts,val){ return '<select id="'+id+'">'+opts.map(o=>'<option'+(o===val?" selected":"")+'>'+esc(o)+'</option>').join("")+'</select>'; }
+
+/* ---------- order builder ---------- */
+let draft=null;
+function openOrderSheet(existing){ draft=existing?JSON.parse(JSON.stringify(existing)):{customer:"",channel:"Messenger",date:todayStr(),status:"New",paid:false,payment:"GCash",notes:"",items:[]}; renderOrderSheet(); }
+function renderOrderSheet(){
+  const d=draft, editing=!!d.id, total=orderTotal(d);
+  let h='<h2>'+(editing?"Edit order":"New order")+'</h2>';
+  h+='<div class="field"><label>Customer name</label><input id="f_customer" placeholder="e.g. Ate Weng" value="'+esc(d.customer)+'"></div>';
+  h+='<div class="two"><div class="field"><label>From</label>'+selectEl("f_channel",CHANNELS,d.channel)+'</div><div class="field"><label>Date</label><input id="f_date" type="date" value="'+esc(d.date)+'"></div></div>';
+  h+='<div class="field"><label>Items</label>';
+  if(d.items.length) h+='<div style="margin-bottom:8px">'+d.items.map((it,i)=>'<div class="lineitem"><span>'+it.qty+'\u00D7 '+esc(it.name)+'</span><span>'+pesoR(it.price*it.qty)+' <span class="x" data-action="delLine" data-i="'+i+'">'+ic("x")+'</span></span></div>').join("")+'</div>';
+  if(S.menu.length){
+    h+='<div style="max-height:210px;overflow-y:auto;margin-bottom:8px">';
+    S.menu.slice().sort((a,b)=>String(a.cat+a.name).localeCompare(b.cat+b.name)).forEach(mi=>{ h+='<div class="menu-pick"><div><div class="nm">'+esc(mi.name)+'</div><div class="pr">'+pesoR(mi.price)+' \u00B7 '+esc(mi.cat)+'</div></div><button class="addbtn" data-action="addMenuItem" data-id="'+mi.id+'">+</button></div>'; });
+    h+='</div>';
+  } else h+='<div class="hint" style="margin-bottom:8px">No menu items yet. Add dishes in the Menu tab, or add a custom line below.</div>';
+  h+='<button class="btn ghost sm" data-action="customLine" style="width:100%">'+ic("plus")+'Custom line item</button></div>';
+  h+='<div class="totbar"><span>Total</span><span>'+pesoR(total)+'</span></div>';
+  h+='<div class="field"><label>Status</label><div class="seg">'+STATUSES.map(s=>'<button data-action="setStatus" data-v="'+s+'" class="'+(d.status===s?"on":"")+'">'+esc(s)+'</button>').join("")+'</div></div>';
+  h+='<div class="field"><label>Payment</label><div class="seg"><button data-action="togglePaid" class="'+(!d.paid?"on":"")+'">Unpaid</button><button data-action="togglePaid" class="'+(d.paid?"on":"")+'">Paid</button></div></div>';
+  if(d.paid) h+='<div class="field"><label>Paid via</label>'+selectEl("f_payment",PAYMENTS,d.payment)+'</div>';
+  h+='<div class="field"><label>Notes / delivery address</label><textarea id="f_notes" placeholder="Delivery address, pickup time, special requests...">'+esc(d.notes)+'</textarea></div>';
+  h+='<button class="btn primary" data-action="saveOrder">'+ic("check")+(editing?"Save changes":"Save order")+'</button>';
+  if(editing) h+='<button class="btn danger" data-action="deleteOrder" data-id="'+d.id+'" style="margin-top:10px">'+ic("trash")+'Delete order</button>';
+  openSheet(h);
+}
+function syncDraftFromDom(){ const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
+  if(g("f_customer")!==undefined)draft.customer=g("f_customer").trim();
+  if(g("f_channel")!==undefined)draft.channel=g("f_channel");
+  if(g("f_date")!==undefined)draft.date=g("f_date")||todayStr();
+  if(g("f_payment")!==undefined)draft.payment=g("f_payment");
+  if(g("f_notes")!==undefined)draft.notes=g("f_notes").trim();
+}
+function saveOrder(){
+  syncDraftFromDom(); const d=draft;
+  if(!d.items.length){ toast("Add at least one item"); return; }
+  if(!d.customer) d.customer="Walk-in";
+  const rec={ customer:d.customer, channel:d.channel, date:d.date, status:d.status, paid:!!d.paid, payment:d.paid?d.payment:"", notes:d.notes, items:d.items, total:orderTotal(d), cost:orderCost(d) };
+  const done=()=>{ closeSheet(); toast(d.id?"Order updated":"Order logged"); };
+  (d.id?BE.set("orders",d.id,rec):BE.add("orders",rec)).then(done).catch(err=>toast("Save failed: "+(err.message||"")));
+}
+/* menu form */
+function openMenuSheet(existing){
+  const m=existing||{name:"",cat:"Meals",price:"",cost:""};
+  let h='<h2>'+(existing?"Edit item":"New menu item")+'</h2>';
+  h+='<div class="field"><label>Name</label><input id="m_name" placeholder="e.g. Palabok (tub)" value="'+esc(m.name)+'"></div>';
+  h+='<div class="field"><label>Category</label>'+selectEl("m_cat",MENU_CATS,m.cat)+'</div>';
+  h+='<div class="two"><div class="field"><label>Selling price</label><input id="m_price" type="number" inputmode="decimal" placeholder="0" value="'+esc(m.price)+'"></div><div class="field"><label>Cost to make</label><input id="m_cost" type="number" inputmode="decimal" placeholder="0" value="'+esc(m.cost)+'"></div></div>';
+  h+='<div class="hint" style="margin-bottom:12px">Cost is optional but it lets the app show your profit per dish.</div>';
+  h+='<button class="btn primary" data-action="saveMenu" data-id="'+(existing?existing.id:"")+'">'+ic("check")+(existing?"Save":"Add item")+'</button>';
+  if(existing) h+='<button class="btn danger" data-action="deleteMenu" data-id="'+existing.id+'" style="margin-top:10px">'+ic("trash")+'Delete item</button>';
+  openSheet(h);
+}
+function saveMenu(id){
+  const name=$("#m_name").value.trim(); if(!name){toast("Name required");return;}
+  const rec={ name, cat:$("#m_cat").value, price:num($("#m_price").value), cost:num($("#m_cost").value) };
+  (id?BE.set("menu",id,rec):BE.add("menu",rec)).then(()=>{closeSheet();toast("Menu saved");}).catch(err=>toast("Save failed: "+(err.message||"")));
+}
+/* expense form */
+function openExpenseSheet(existing){
+  const e=existing||{description:"",category:"Ingredients",amount:"",date:todayStr()};
+  let h='<h2>'+(existing?"Edit expense":"Add expense")+'</h2>';
+  h+='<div class="field"><label>What was it for?</label><input id="e_desc" placeholder="e.g. Palengke run" value="'+esc(e.description)+'"></div>';
+  h+='<div class="two"><div class="field"><label>Category</label>'+selectEl("e_cat",EXP_CATS,e.category)+'</div><div class="field"><label>Amount</label><input id="e_amt" type="number" inputmode="decimal" placeholder="0" value="'+esc(e.amount)+'"></div></div>';
+  h+='<div class="field"><label>Date</label><input id="e_date" type="date" value="'+esc(e.date)+'"></div>';
+  h+='<button class="btn primary" data-action="saveExpense" data-id="'+(existing?existing.id:"")+'">'+ic("check")+(existing?"Save":"Add expense")+'</button>';
+  if(existing) h+='<button class="btn danger" data-action="deleteExpense" data-id="'+existing.id+'" style="margin-top:10px">'+ic("trash")+'Delete</button>';
+  openSheet(h);
+}
+function saveExpense(id){
+  const amt=num($("#e_amt").value); if(amt<=0){toast("Enter an amount");return;}
+  const rec={ description:$("#e_desc").value.trim(), category:$("#e_cat").value, amount:amt, date:$("#e_date").value||todayStr() };
+  (id?BE.set("expenses",id,rec):BE.add("expenses",rec)).then(()=>{closeSheet();toast("Expense saved");}).catch(err=>toast("Save failed: "+(err.message||"")));
+}
+/* capital form */
+function openCapitalSheet(existing){
+  const c=existing||{description:"",type:"in",amount:"",date:todayStr()};
+  let h='<h2>'+(existing?"Edit entry":"Capital entry")+'</h2>';
+  h+='<div class="field"><label>Type</label><div class="seg"><button data-action="capType" data-v="in" class="'+(c.type!=="out"?"on":"")+'">Money in</button><button data-action="capType" data-v="out" class="'+(c.type==="out"?"on":"")+'">Money out</button></div><input type="hidden" id="c_type" value="'+esc(c.type||"in")+'"></div>';
+  h+='<div class="field"><label>Note</label><input id="c_desc" placeholder="e.g. Starting capital" value="'+esc(c.description)+'"></div>';
+  h+='<div class="two"><div class="field"><label>Amount</label><input id="c_amt" type="number" inputmode="decimal" placeholder="0" value="'+esc(c.amount)+'"></div><div class="field"><label>Date</label><input id="c_date" type="date" value="'+esc(c.date)+'"></div></div>';
+  h+='<button class="btn primary" data-action="saveCapital" data-id="'+(existing?existing.id:"")+'">'+ic("check")+(existing?"Save":"Add entry")+'</button>';
+  if(existing) h+='<button class="btn danger" data-action="deleteCapital" data-id="'+existing.id+'" style="margin-top:10px">'+ic("trash")+'Delete</button>';
+  openSheet(h);
+}
+function saveCapital(id){
+  const amt=num($("#c_amt").value); if(amt<=0){toast("Enter an amount");return;}
+  const rec={ description:$("#c_desc").value.trim(), type:$("#c_type").value||"in", amount:amt, date:$("#c_date").value||todayStr() };
+  (id?BE.set("capital",id,rec):BE.add("capital",rec)).then(()=>{closeSheet();toast("Capital saved");}).catch(err=>toast("Save failed: "+(err.message||"")));
+}
+function confirmDelete(coll,id,msg){
+  let h='<h2>'+esc(msg)+'</h2><p class="muted" style="margin:-6px 2px 16px">This can\u2019t be undone.</p><button class="btn danger" id="confirmDel">'+ic("trash")+'Yes, delete</button><button class="btn ghost" data-action="closeSheet" style="margin-top:10px">Keep it</button>';
+  openSheet(h);
+  $("#confirmDel").addEventListener("click",()=>{ BE.remove(coll,id).then(()=>{closeSheet();toast("Deleted");}).catch(err=>toast("Delete failed: "+(err.message||""))); });
+}
+function loadStarter(){ Promise.all(STARTER.map(s=>BE.add("menu",{name:s.name,cat:s.cat,price:s.price,cost:s.cost}))).then(()=>toast("Starter menu added - tap any item to edit")).catch(()=>toast("Couldn't add starter menu")); }
+function openAccount(){
+  const exp='<div class="section-title" style="margin:8px 2px 8px">Export for reporting</div><div class="two"><button class="btn ghost sm" style="width:100%" data-action="export" data-set="orders">Orders CSV</button><button class="btn ghost sm" style="width:100%" data-action="export" data-set="expenses">Expenses CSV</button></div><div class="two" style="margin-top:8px"><button class="btn ghost sm" style="width:100%" data-action="export" data-set="capital">Capital CSV</button><button class="btn ghost sm" style="width:100%" data-action="export" data-set="menu">Menu CSV</button></div><button class="btn ghost" style="margin-top:8px" data-action="exportExcel">Excel workbook (all tabs)</button>';
+  let top;
+  if(mode==="cloud") top='<div class="hint" style="margin-bottom:12px">Signed in as <strong>'+esc(currentEmail)+'</strong>. Everything syncs live to anyone else signed in.</div><button class="btn danger" data-action="signout">Sign out</button>';
+  else top='<div class="hint" style="margin-bottom:12px">Saved on this device only. Add Supabase keys in index.html to turn on login + sync.</div>';
+  openSheet('<h2>Account</h2>'+top+'<div style="height:16px"></div>'+exp);
+}
+
+/* ---------- export (CSV / Excel) ---------- */
+function csvCell(v){ v=(v==null?"":String(v)); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function toCSV(headers,rows){ return [headers.map(csvCell).join(",")].concat(rows.map(r=>r.map(csvCell).join(","))).join("\r\n"); }
+function dl(name,text,type){ const b=new Blob(["\ufeff"+text],{type:(type||"text/csv")+";charset=utf-8"}); const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
+const EXPORTS={
+  orders:{ h:["Date","Customer","From","Status","Paid","Payment","Items","Total","Cost","Profit","Notes","Logged"], r:()=>S.orders.map(o=>[o.date,o.customer,o.channel,o.status,o.paid?"Yes":"No",o.payment,(o.items||[]).map(i=>i.qty+"x "+i.name).join("; "),orderTotal(o),orderCost(o),orderTotal(o)-orderCost(o),o.notes,new Date(o.createdAt).toLocaleString("en-PH")]) },
+  expenses:{ h:["Date","Description","Category","Amount","Logged"], r:()=>S.expenses.map(e=>[e.date,e.description,e.category,num(e.amount),new Date(e.createdAt).toLocaleString("en-PH")]) },
+  capital:{ h:["Date","Note","Type","Amount","Logged"], r:()=>S.capital.map(c=>[c.date,c.description,c.type==="out"?"Out":"In",num(c.amount),new Date(c.createdAt).toLocaleString("en-PH")]) },
+  menu:{ h:["Name","Category","Price","Cost","Margin %"], r:()=>S.menu.map(m=>[m.name,m.cat,num(m.price),num(m.cost),num(m.price)>0?Math.round((1-num(m.cost)/num(m.price))*100):0]) },
+};
+function exportCSV(set){ const e=EXPORTS[set]; if(!e)return; dl("nikis-"+set+"-"+todayStr()+".csv", toCSV(e.h,e.r())); toast("Exported "+set+".csv"); }
+function exportExcel(){
+  toast("Building Excel...");
+  const go=X=>{ const wb=X.utils.book_new(); Object.keys(EXPORTS).forEach(k=>{ const e=EXPORTS[k]; const ws=X.utils.aoa_to_sheet([e.h].concat(e.r())); X.utils.book_append_sheet(wb,ws,k.charAt(0).toUpperCase()+k.slice(1)); }); X.writeFile(wb,"nikis-food-hub-"+todayStr()+".xlsx"); };
+  if(window.XLSX) return go(window.XLSX);
+  const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+  s.onload=()=>go(window.XLSX); s.onerror=()=>toast("Excel needs internet. Use CSV instead."); document.head.appendChild(s);
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", e=>{
+  const el=e.target.closest("[data-action]"); if(!el) return;
+  const a=el.dataset.action, id=el.dataset.id;
+  switch(a){
+    case "closeSheet": closeSheet(); break;
+    case "account": openAccount(); break;
+    case "signout": if(mode==="cloud"&&sb){ sb.auth.signOut(); } closeSheet(); break;
+    case "export": exportCSV(el.dataset.set); break;
+    case "exportExcel": exportExcel(); break;
+    case "goOrders": S.tab="orders"; render(); break;
+    case "newOrder": openOrderSheet(null); break;
+    case "openOrder": { const o=S.orders.find(x=>x.id===id); if(o) openOrderSheet(o); break; }
+    case "ordersFilter": S.ordersFilter=el.dataset.f; renderOrders(); break;
+    case "addMenuItem": { const mi=S.menu.find(x=>x.id===id); if(mi){ const ex=draft.items.find(it=>it.menuId===mi.id); if(ex)ex.qty++; else draft.items.push({menuId:mi.id,name:mi.name,price:num(mi.price),cost:num(mi.cost),qty:1}); syncDraftFromDom(); renderOrderSheet(); } break; }
+    case "delLine": syncDraftFromDom(); draft.items.splice(+el.dataset.i,1); renderOrderSheet(); break;
+    case "customLine": openCustomLine(); break;
+    case "addCustomLine": { const nm=$("#cl_name").value.trim(), pr=num($("#cl_price").value), qty=Math.max(1,parseInt($("#cl_qty").value)||1), co=num($("#cl_cost").value); if(!nm||pr<=0){toast("Name and price needed");return;} draft.items.push({name:nm,price:pr,cost:co,qty:qty}); renderOrderSheet(); break; }
+    case "backToOrder": renderOrderSheet(); break;
+    case "setStatus": syncDraftFromDom(); draft.status=el.dataset.v; renderOrderSheet(); break;
+    case "togglePaid": syncDraftFromDom(); draft.paid=!draft.paid; renderOrderSheet(); break;
+    case "saveOrder": saveOrder(); break;
+    case "deleteOrder": confirmDelete("orders",id,"Delete this order?"); break;
+    case "newMenu": openMenuSheet(null); break;
+    case "editMenu": { const m=S.menu.find(x=>x.id===id); if(m) openMenuSheet(m); break; }
+    case "saveMenu": saveMenu(id); break;
+    case "deleteMenu": confirmDelete("menu",id,"Delete this menu item?"); break;
+    case "starterMenu": loadStarter(); break;
+    case "moneyTab": S.moneyTab=el.dataset.t; renderMoney(); break;
+    case "newExpense": openExpenseSheet(null); break;
+    case "editExpense": { const x=S.expenses.find(v=>v.id===id); if(x) openExpenseSheet(x); break; }
+    case "saveExpense": saveExpense(id); break;
+    case "deleteExpense": confirmDelete("expenses",id,"Delete this expense?"); break;
+    case "newCapital": openCapitalSheet(null); break;
+    case "editCapital": { const x=S.capital.find(v=>v.id===id); if(x) openCapitalSheet(x); break; }
+    case "capType": document.querySelectorAll('[data-action="capType"]').forEach(b=>b.classList.toggle("on",b.dataset.v===el.dataset.v)); { const t=$("#c_type"); if(t)t.value=el.dataset.v; } break;
+    case "saveCapital": saveCapital(id); break;
+    case "deleteCapital": confirmDelete("capital",id,"Delete this entry?"); break;
+  }
+});
+document.querySelectorAll(".tab").forEach(b=> b.addEventListener("click",()=>{ S.tab=b.dataset.tab; render(); }) );
+function openCustomLine(){ syncDraftFromDom(); openSheet('<h2>Custom line item</h2><div class="field"><label>Item name</label><input id="cl_name" placeholder="e.g. Extra rice"></div><div class="two"><div class="field"><label>Price</label><input id="cl_price" type="number" inputmode="decimal" placeholder="0"></div><div class="field"><label>Qty</label><input id="cl_qty" type="number" inputmode="numeric" value="1"></div></div><div class="field"><label>Cost (optional)</label><input id="cl_cost" type="number" inputmode="decimal" placeholder="0"></div><button class="btn primary" data-action="addCustomLine">'+ic("check")+'Add to order</button><button class="btn ghost" data-action="backToOrder" style="margin-top:10px">Back</button>'); }
+
+/* ---------- sync badge ---------- */
+function setSync(state){ const dot=$("#syncDot"), txt=$("#syncText");
+  if(state==="on"){ dot.className="dot on"; txt.textContent=(currentEmail.split("@")[0]||"Synced"); }
+  else if(state==="local"){ dot.className="dot local"; txt.textContent="This device"; }
+  else if(state==="err"){ dot.className="dot err"; txt.textContent="Error"; }
+  else { dot.className="dot"; txt.textContent="Account"; }
+}
+$("#dateSub").textContent=new Date().toLocaleDateString("en-US",{weekday:"long"});
+
+/* ---------- gate: config + login ---------- */
+function configured(){ return SUPABASE_URL && !/YOUR-PROJECT/.test(SUPABASE_URL) && SUPABASE_ANON_KEY && !/YOUR-ANON/.test(SUPABASE_ANON_KEY); }
+function showGate(html){ $("#gate").innerHTML=html; $("#gate").classList.add("show"); $("#root").classList.remove("show"); }
+function hideGate(){ $("#gate").classList.remove("show"); $("#root").classList.add("show"); }
+function logoSvg(){ return '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>'; }
+let authMode="signin";
+function showLogin(msg){
+  showGate('<div class="auth"><div class="logo">'+logoSvg()+'</div><h1>Niki\u2019s Food Hub</h1><p class="tag">Sign in to your kitchen dashboard</p><div class="auth-card">'+
+    '<div class="authtabs"><button id="tabSignin" class="'+(authMode==="signin"?"on":"")+'" data-mode="signin">Sign in</button><button id="tabSignup" class="'+(authMode==="signup"?"on":"")+'" data-mode="signup">Create account</button></div>'+
+    '<div class="field"><label>Email</label><input id="au_email" type="email" autocomplete="username" placeholder="you@email.com"></div>'+
+    '<div class="field"><label>Password</label><input id="au_pass" type="password" autocomplete="current-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"></div>'+
+    '<button class="btn primary" id="au_go">'+(authMode==="signup"?"Create account":"Sign in")+'</button>'+
+    '<div class="auth-err" id="au_err">'+(msg?esc(msg):"")+'</div>'+
+    '</div><p class="auth-note">Niki and Marlon use the same login or one each. Same data syncs to both.</p></div>');
+  const bind=()=>{
+    document.querySelectorAll(".authtabs button").forEach(b=>b.addEventListener("click",()=>{ authMode=b.dataset.mode; showLogin(); }));
+    const go=$("#au_go"), em=$("#au_email"), pw=$("#au_pass");
+    const submit=()=>doAuth(em.value.trim(), pw.value, go);
+    go.addEventListener("click",submit);
+    pw.addEventListener("keydown",e=>{ if(e.key==="Enter") submit(); });
+  };
+  bind();
+}
+function authErr(m){ const e=$("#au_err"); if(e)e.textContent=m; }
+function doAuth(email,password,btn){
+  if(!email||!password){ authErr("Enter your email and password."); return; }
+  if(password.length<6){ authErr("Password must be at least 6 characters."); return; }
+  btn.disabled=true; btn.textContent="Please wait...";
+  const p = authMode==="signup" ? sb.auth.signUp({email,password}) : sb.auth.signInWithPassword({email,password});
+  p.then(({data,error})=>{
+    btn.disabled=false; btn.textContent=(authMode==="signup"?"Create account":"Sign in");
+    if(error){ authErr(error.message||"Could not sign in."); return; }
+    if(authMode==="signup" && data && data.user && !data.session){ authErr("Account made. Check your email to confirm, then sign in."); authMode="signin"; return; }
+    /* session arrives via onAuthStateChange -> enterApp */
+  }).catch(err=>{ btn.disabled=false; authErr(err.message||"Something went wrong."); });
+}
+function enterApp(user){
+  if(booted) return; booted=true; currentEmail=(user&&user.email)||"";
+  hideGate(); setSync("on"); render();
+  subs = COLLS.map(coll=> BE.subscribe(coll, docs=>{ S[coll]=docs||[]; render(); }) );
+}
+function exitApp(){
+  booted=false; currentEmail="";
+  subs.forEach(u=>{ try{u();}catch(e){} }); subs=[];
+  COLLS.forEach(c=>S[c]=[]); S.tab="home";
+  setSync(); showLogin();
+}
+
+/* ---------- boot ---------- */
+function startLocal(){
+  mode="local"; BE=makeLocalBackend(); booted=true;
+  hideGate(); setSync("local"); render();
+  subs = COLLS.map(coll=> BE.subscribe(coll, docs=>{ S[coll]=docs||[]; render(); }) );
+}
+function boot(){
+  if(!configured() || !window.supabase){ startLocal(); return; }
+  mode="cloud";
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  BE = makeSupabaseBackend(sb);
+  sb.auth.getSession().then(({data})=>{ if(data&&data.session) enterApp(data.session.user); else showLogin(); }).catch(()=>showLogin());
+  sb.auth.onAuthStateChange((event,session)=>{ if(session && !booted) enterApp(session.user); else if(!session && booted && mode==="cloud") exitApp(); });
+}
+boot();
+})();
+</script>
+</body>
+</html>
