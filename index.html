@@ -325,21 +325,27 @@ function metrics(){
   const t=todayStr(), mk=monthKey(t);
   const live=S.orders.filter(o=>o.status!=="Cancelled");
   const paid=live.filter(o=>o.paid);
+  const paidMonth=paid.filter(o=>monthKey(o.date)===mk);
   const sum=(arr,f)=>arr.reduce((s,x)=>s+f(x),0);
   const capIn=sum(S.capital.filter(c=>c.type!=="out"),c=>num(c.amount));
   const capOut=sum(S.capital.filter(c=>c.type==="out"),c=>num(c.amount));
   const totalCollected=sum(paid,orderTotal);
-  const totalExpenses=sum(S.expenses,e=>num(e.amount));
-  const monthCollected=sum(paid.filter(o=>monthKey(o.date)===mk),orderTotal);
-  const monthExpenses=sum(S.expenses.filter(e=>monthKey(e.date)===mk),e=>num(e.amount));
+  const totalCogs=sum(paid,orderCost);                          // cost of goods, from menu item costs
+  const manualExpenses=sum(S.expenses,e=>num(e.amount));        // packaging, gas, transport, etc.
+  const totalExpenses=totalCogs+manualExpenses;
+  const monthCollected=sum(paidMonth,orderTotal);
+  const monthCogs=sum(paidMonth,orderCost);
+  const monthManual=sum(S.expenses.filter(e=>monthKey(e.date)===mk),e=>num(e.amount));
+  const monthExpenses=monthCogs+monthManual;
   const todayOrders=live.filter(o=>o.date===t);
   return {
     todayCount:todayOrders.length, todaySales:sum(todayOrders,orderTotal), todayCollected:sum(todayOrders.filter(o=>o.paid),orderTotal),
     active:live.filter(o=>["New","Preparing","Ready"].includes(o.status)).length,
     unpaidAmt:sum(live.filter(o=>!o.paid),orderTotal),
-    capNet:capIn-capOut, capIn, capOut, totalCollected, totalExpenses,
+    capNet:capIn-capOut, capIn, capOut,
+    totalCollected, totalCogs, manualExpenses, totalExpenses,
     cashOnHand:(capIn-capOut)+totalCollected-totalExpenses,
-    monthCollected, monthExpenses, monthProfit:monthCollected-monthExpenses, monthKey:mk,
+    monthCollected, monthCogs, monthManual, monthExpenses, monthProfit:monthCollected-monthExpenses, monthKey:mk,
   };
 }
 
@@ -418,17 +424,26 @@ function renderMoney(){
   let h='<div class="section-title">Money</div><div class="chips">'+tabs.map(([k,l])=>'<button class="chip '+(S.moneyTab===k?"active":"")+'" data-action="moneyTab" data-t="'+k+'">'+esc(l)+'</button>').join("")+'</div>';
   if(S.moneyTab==="summary"){
     h+='<div class="grid2" style="margin-top:4px">'+kpiCard("Cash on hand", pesoR(m.cashOnHand), "money you actually have", "brand")+kpiCard("To collect", pesoR(m.unpaidAmt), "unpaid orders")+'</div>';
-    h+='<div class="card" style="margin-top:14px;padding:4px 4px">';
+    h+='<div class="section-title" style="margin-top:16px">This month</div>';
+    h+='<div class="card" style="padding:4px 4px">';
+    h+=moneyLine("Revenue collected","+"+pesoR(m.monthCollected),"pos");
+    h+=moneyLine("Cost of goods (menu)","\u2212"+pesoR(m.monthCogs),"neg");
+    h+=moneyLine("Other expenses","\u2212"+pesoR(m.monthManual),"neg");
+    h+=moneyLine("= Profit", pesoR(m.monthProfit), m.monthProfit>=0?"pos":"neg", true);
+    h+='</div>';
+    h+='<div class="section-title" style="margin-top:16px">All time</div>';
+    h+='<div class="card" style="padding:4px 4px">';
     h+=moneyLine("Capital put in", pesoR(m.capIn));
     if(m.capOut>0) h+=moneyLine("Capital taken out","\u2212"+pesoR(m.capOut));
-    h+=moneyLine("Revenue collected (all)","+"+pesoR(m.totalCollected),"pos");
-    h+=moneyLine("Expenses (all)","\u2212"+pesoR(m.totalExpenses),"neg");
+    h+=moneyLine("Revenue collected","+"+pesoR(m.totalCollected),"pos");
+    h+=moneyLine("Cost of goods (menu)","\u2212"+pesoR(m.totalCogs),"neg");
+    h+=moneyLine("Other expenses","\u2212"+pesoR(m.manualExpenses),"neg");
     h+=moneyLine("= Cash on hand", pesoR(m.cashOnHand),"",true);
-    h+='</div><div class="section-title" style="margin-top:18px">This month</div><div class="grid3">';
-    h+=kpiMini("Revenue", pesoR(m.monthCollected))+kpiMini("Expenses", pesoR(m.monthExpenses))+kpiMini("Profit", pesoR(m.monthProfit), m.monthProfit>=0?"pos":"neg");
-    h+='</div><div class="hint" style="margin-top:14px">Revenue counts orders marked <strong>Paid</strong>. Mark an order paid in the Orders tab when the money lands.</div>';
+    h+='</div>';
+    h+='<div class="hint" style="margin-top:14px"><strong>Cost of goods</strong> is pulled automatically from each item\u2019s cost in the Menu, for orders marked Paid. So set costs in Menu and profit computes itself. Log packaging, gas, and transport under <strong>Expenses</strong> since those aren\u2019t in item costs. Don\u2019t log ingredient buys there too, or you\u2019ll double count.</div>';
   } else if(S.moneyTab==="expenses"){
     h+='<button class="btn primary" data-action="newExpense" style="margin:4px 0 8px">'+ic("plus")+'Add expense</button>';
+    h+='<div class="hint" style="margin-bottom:10px">For costs you enter yourself: packaging, gas, transport. Ingredient cost per dish comes from the Menu automatically and shows under Summary.</div>';
     if(!S.expenses.length) h+=emptyBox("wallet","No expenses logged","Track ingredients, packaging, gas, and transport here.","newExpense","Add expense");
     else{
       h+='<div class="totbar"><span>Total logged</span><span>'+pesoR(S.expenses.reduce((s,e)=>s+num(e.amount),0))+'</span></div><div class="card">';
